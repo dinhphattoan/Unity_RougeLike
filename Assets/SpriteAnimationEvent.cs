@@ -8,7 +8,7 @@ public class SpriteAnimationEvent : MonoBehaviour
     [Header("Player attributes")]
     private BoxCollider2D playerCollider2D;
     private PlayerManager playerManager;
-
+    public float knockBackForce=500f;
     [SerializeField] LayerMask layerMask;
     private void Start()
     {
@@ -24,6 +24,9 @@ public class SpriteAnimationEvent : MonoBehaviour
             foreach(var h in hit)
             {
                 Debug.Log("Attacked!" +h.transform.name);
+                Rigidbody2D entityRB = h.transform.GetComponent<Rigidbody2D>();
+                Vector2 pushDirection = h.transform.position-playerManager.transform.position;
+                entityRB.AddForce( pushDirection.normalized* knockBackForce, ForceMode2D.Impulse);
             }
         }
 

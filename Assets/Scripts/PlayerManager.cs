@@ -27,6 +27,7 @@ public class PlayerManager : MonoBehaviour
     public float chargeTime = 1f;
     [Space]
     public float attack1Damage;
+    //Attack range
     public float attack1Range;
     [SerializeField] float chargeTimeCounter = 0f;
     private void OnEnable()
@@ -53,7 +54,7 @@ public class PlayerManager : MonoBehaviour
         Color raycolor = Color.green;
         Debug.DrawRay(playerCollider2D.bounds.center - new Vector3(0, playerCollider2D.bounds.size.y / 2), onFaceDirection * attack1Range, raycolor);
         Debug.DrawRay(playerCollider2D.bounds.center + new Vector3(0, playerCollider2D.bounds.size.y / 2), onFaceDirection * attack1Range, raycolor);
-        Debug.DrawRay(playerCollider2D.bounds.center + new Vector3(playerCollider2D.bounds.size.x / 2, -playerCollider2D.bounds.size.y / 2), Vector3.down * (playerCollider2D.bounds.extents.y), raycolor);
+
 
     }
 
@@ -76,11 +77,11 @@ public class PlayerManager : MonoBehaviour
         if (!playerAnimator.GetCurrentAnimatorStateInfo(0).IsName("Attack"))
             if (angle > 90 || angle < -90)
             {
-                this._spriteTransform.localScale = new Vector3(-1, 1, 1);
+                this.onFaceDirection = Vector2.left;
             }
             else
             {
-                this._spriteTransform.localScale = new Vector3(1, 1, 1);
+                this.onFaceDirection = Vector2.right;
             }
         if (inputMoveDirection.x != 0 && !isFreezed && !playerAnimator.GetCurrentAnimatorStateInfo(0).IsName("Attack"))
         {
@@ -111,7 +112,7 @@ public class PlayerManager : MonoBehaviour
             playerRigid.AddForce(Vector2.up * jump_Force, ForceMode2D.Impulse);
             playerAnimator.Play("Jump");
         }
-        if (playerRigid.velocity.y < 0f)
+        if (playerRigid.velocity.y <= -0.1f)
         {
             playerAnimator.Play("Fall");
         }
@@ -122,7 +123,6 @@ public class PlayerManager : MonoBehaviour
         _Handle_Attack();
         _Handle_Block();
     }
-
     private void _Handle_Block()
     {
         if (Input.GetMouseButton(1) && !playerAnimator.GetCurrentAnimatorStateInfo(0).IsName("Attack"))
@@ -148,6 +148,17 @@ public class PlayerManager : MonoBehaviour
                 playerAnimator.SetBool("ShieldBlock", false);
                 isBlocking = false;
                 chargeTimeCounter = 0;
+                Vector3 mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+                Vector3 direction = mousePosition - transform.position;
+                float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+                if (angle > 90 || angle < -90)
+                {
+                    this.onFaceDirection = Vector2.left;
+                }
+                else
+                {
+                    this.onFaceDirection = Vector2.right;
+                }
                 playerAnimator.Play("Attack");
             }
         }
@@ -169,6 +180,17 @@ public class PlayerManager : MonoBehaviour
             else
             {
                 return Vector2.left;
+            }
+        }
+        set
+        {
+            if (value.x > 0)
+            {
+                this._spriteTransform.localScale = new Vector3(1, 1, 1);
+            }
+            else
+            {
+                this._spriteTransform.localScale = new Vector3(-1, 1, 1);
             }
         }
     }
@@ -198,6 +220,6 @@ public class PlayerManager : MonoBehaviour
     }
     private void OnDrawGizmos()
     {
-        
+
     }
 }
