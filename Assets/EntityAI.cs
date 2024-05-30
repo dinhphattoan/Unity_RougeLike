@@ -3,6 +3,7 @@ using UnityEngine;
 
 public class EntityAI : MonoBehaviour
 {
+    
     public Transform playerTransform;
     public float speed = 5f;
     public float scoutingRange = 5f;

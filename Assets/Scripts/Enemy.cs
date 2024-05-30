@@ -3,6 +3,7 @@ using UnityEngine;
 
 public class Enemy : StateMachineBehaviour
 {
+    
     // Transform player;
     // Rigidbody2D rigidbody2D;
     // public Vector2 moveDirection;
@@ -70,4 +71,5 @@ public class Enemy : StateMachineBehaviour
     //         }
     //     }
     // }
+    
 }
