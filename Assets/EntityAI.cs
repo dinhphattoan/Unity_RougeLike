@@ -1,8 +1,5 @@
 
-using System;
-using System.Collections;
 using UnityEngine;
-using UnityEngine.UIElements;
 
 public class EntityAI : MonoBehaviour
 {
@@ -12,7 +9,8 @@ public class EntityAI : MonoBehaviour
     [SerializeField] Transform entityGFX;
     [SerializeField] BoxCollider2D entityCollider2D;
     [SerializeField] LayerMask layerMaskPlatform;
-
+    [SerializeField] float valueHeadHeight = 2f;
+    [SerializeField] float valueFeetHeight = 1f;
     public Vector2 desiredPosition = Vector2.zero;// current position desired
     Rigidbody2D entityRb;
     [Header("Scout attributes")]
@@ -55,52 +53,75 @@ public class EntityAI : MonoBehaviour
     public void HandleMovement()
     {
         targetPosition = OnScoutPlayer;
+        //if player is scouted
         if (targetPosition != Vector2.zero)
         {
-            if (maxIdentifyTimeCounter == maxIdentifyTime||isInvestigating==true)
+            //When identify is fully complete
+            //Chase player
+            if (maxIdentifyTimeCounter == maxIdentifyTime)
             {
-                moveToPosition(speedWhenAlerted);
+                moveToPosition(speedWhenAlerted, ref targetPosition, targetPosition - (Vector2)this.transform.position);
+                lastKnownTarget = targetPosition;
+                lastKnownSide = lastKnownTarget - (Vector2)this.transform.position;
             }
         }
-        //Body movement naturally
-        else if(maxIdentifyTimeCounter==0)
+        //If the player is outside of scouting range
+        else
         {
-            //Make enemy go left and right
-            Vector2 side = OnEdgeSideAllowed;
-            if (side == OnDirectionFacing)
+            //Go check the last known place that player was scouted
+            if (lastKnownTarget != Vector2.zero)
             {
-                enityThinkingSecondCounter = Mathf.MoveTowards(enityThinkingSecondCounter, enityThinkingSecondMax, Time.fixedDeltaTime);
-                if (enityThinkingSecondCounter >= enityThinkingSecondMax)
-                {
-                    OnFaceDirection = OnFaceDirection * -1;
-                    enityThinkingSecondCounter = 0;
-                }
+                moveToPosition(speedWhenAlerted, ref lastKnownTarget,lastKnownSide);
             }
+            //If checked the last known place that player was scouted but didn't find any or out of reach
             else
             {
-                if (OnFaceDirection == Vector2.left)
+                maxIdentifyTimeCounter = Mathf.MoveTowards(maxIdentifyTimeCounter, 0, Time.fixedDeltaTime);
+                //When not alerted or lost of player vision
+                if (maxIdentifyTimeCounter == 0)
                 {
-                    this.entityRb.AddForce(OnFaceDirection * speed * Time.deltaTime, ForceMode2D.Impulse);
+                    //Make enemy go left and right
+                    Vector2 side = OnEdgeSideAllowed;
+                    if (side == OnDirectionFacing)
+                    {
+                        enityThinkingSecondCounter = Mathf.MoveTowards(enityThinkingSecondCounter, enityThinkingSecondMax, Time.fixedDeltaTime);
+                        if (enityThinkingSecondCounter >= enityThinkingSecondMax)
+                        {
+                            OnFaceDirection = OnFaceDirection * -1;
+                            enityThinkingSecondCounter = 0;
+                        }
+                    }
+                    else
+                    {
+                        if (OnFaceDirection == Vector2.left)
+                        {
+                            this.entityRb.AddForce(OnFaceDirection * speed * Time.deltaTime, ForceMode2D.Impulse);
+                        }
+                        else if (OnDirectionFacing == Vector2.right)
+                        {
+                            this.entityRb.AddForce(OnFaceDirection * speed * Time.deltaTime, ForceMode2D.Impulse);
+                        }
+                    }
                 }
-                else if (OnDirectionFacing == Vector2.right)
-                {
-                    this.entityRb.AddForce(OnFaceDirection * speed * Time.deltaTime, ForceMode2D.Impulse);
-                }
+
             }
+
         }
 
     }
     public bool isInvestigating = false;
-    Vector2 targetPosition = Vector2.zero;
-    private void moveToPosition(float speed)
+    public Vector2 targetPosition = Vector2.zero;
+    private Vector2 lastKnownTarget = Vector2.zero;
+    private Vector2 lastKnownSide = Vector2.zero;
+    private void moveToPosition(float speed, ref Vector2 position, Vector2 directionSide)
     {
-        isInvestigating=true;
+        isInvestigating = true;
         Vector2 side = OnEdgeSideAllowed;
-        Vector2 direction = targetPosition - (Vector2)this.transform.position;
-        if (direction.x > 0)
+        if (directionSide.x > 0)
         {
             OnFaceDirection = Vector2.right;
-            if (this.transform.position.x < targetPosition.x && side != Vector2.right)
+            //Check if the way is clear to move
+            if (this.transform.position.x < position.x && side != Vector2.right)
             {
                 this.entityRb.AddForce(OnFaceDirection * speed * Time.deltaTime, ForceMode2D.Impulse);
                 return;
@@ -109,16 +130,27 @@ public class EntityAI : MonoBehaviour
         else
         {
             OnFaceDirection = Vector2.left;
-            if (this.transform.position.x > targetPosition.x && side != Vector2.left)
+            //Check if the way is clear to move
+            if (this.transform.position.x > position.x && side != Vector2.left)
             {
                 this.entityRb.AddForce(OnFaceDirection * speed * Time.deltaTime, ForceMode2D.Impulse);
                 return;
             }
         }
-        isInvestigating=false;
+        //Otherwise stop the intend when it reach out of boundaries by setting it to zero
+        position = Vector2.zero;
     }
-
-
+    private bool HaveReached(Vector2 targetPosition, Vector2 side)
+    {
+        if (side.x > 0)
+        {
+            return this.transform.position.x >= targetPosition.x;
+        }
+        else
+        {
+            return this.transform.position.x <= targetPosition.x;
+        }
+    }
     public Vector2 OnDirectionFacing
     {
         get
@@ -136,8 +168,8 @@ public class EntityAI : MonoBehaviour
     private void OnDrawGizmos()
     {
         Gizmos.color = Color.cyan;
-        Gizmos.DrawLine(this.transform.position, (Vector2)this.transform.position + (scoutingRangeFront * OnDirectionFacing));
-        Gizmos.DrawLine(this.transform.position, (Vector2)this.transform.position + (OnDirectionFacing * -1 * scoutingRangeBack));
+        //Scout radius
+        Gizmos.DrawWireCube(new Vector2(this.transform.position.x, this.transform.position.y + 2f), new Vector2(scoutingRangeFront * 2, this.entityCollider2D.bounds.size.y + 2f));
         //Gizmo jump distance allowed
         Gizmos.color = Color.black;
         Gizmos.DrawLine(this.transform.position, (Vector2)this.transform.position + (OnDirectionFacing * maxJumpDistance));
@@ -172,15 +204,30 @@ public class EntityAI : MonoBehaviour
         {
             float extraHeightText = 5f;
             //Check wall two side
-            //wall left
-            RaycastHit2D hit = Physics2D.Raycast(this.transform.position, Vector2.left, entityCollider2D.bounds.extents.x + 1f, layerMaskPlatform);
-            Debug.DrawLine(this.transform.position + new Vector3(-entityCollider2D.bounds.extents.x, -1), this.transform.position + new Vector3(-entityCollider2D.bounds.extents.x, -1) + Vector3.left * (+1f));
+            //wall left upper
+            RaycastHit2D hit = Physics2D.Raycast(this.transform.position + new Vector3(0, valueHeadHeight), Vector2.left, entityCollider2D.bounds.extents.x + 1f, layerMaskPlatform);
+            Debug.DrawLine(this.transform.position + new Vector3(-entityCollider2D.bounds.extents.x, valueHeadHeight), this.transform.position + new Vector3(-entityCollider2D.bounds.extents.x, valueHeadHeight) + Vector3.left * (+1f));
             if (hit)
             {
                 return Vector2.left;
             }
-            hit = Physics2D.Raycast(this.transform.position, Vector2.right, entityCollider2D.bounds.extents.x + 1f, layerMaskPlatform);
-            Debug.DrawLine(this.transform.position + new Vector3(entityCollider2D.bounds.extents.x, -1), this.transform.position + new Vector3(entityCollider2D.bounds.extents.x, -1) + Vector3.right * (+1f));
+            //Wall left down
+            hit = Physics2D.Raycast(this.transform.position + new Vector3(0, valueFeetHeight), Vector2.left, entityCollider2D.bounds.extents.x + 1f, layerMaskPlatform);
+            Debug.DrawLine(this.transform.position + new Vector3(-entityCollider2D.bounds.extents.x, valueFeetHeight), this.transform.position + new Vector3(-entityCollider2D.bounds.extents.x, valueFeetHeight) + Vector3.left * (+1f));
+            if (hit)
+            {
+                return Vector2.left;
+            }
+            //Wall right upper
+            hit = Physics2D.Raycast(this.transform.position + new Vector3(0, valueHeadHeight), Vector2.right, entityCollider2D.bounds.extents.x + 1f, layerMaskPlatform);
+            Debug.DrawLine(this.transform.position + new Vector3(entityCollider2D.bounds.extents.x, valueHeadHeight), this.transform.position + new Vector3(entityCollider2D.bounds.extents.x, valueHeadHeight) + Vector3.right * (+1f));
+            if (hit)
+            {
+                return Vector2.right;
+            }
+            //Wall right down
+            hit = Physics2D.Raycast(this.transform.position + new Vector3(0, valueFeetHeight), Vector2.right, entityCollider2D.bounds.extents.x + 1f, layerMaskPlatform);
+            Debug.DrawLine(this.transform.position + new Vector3(entityCollider2D.bounds.extents.x, valueFeetHeight), this.transform.position + new Vector3(entityCollider2D.bounds.extents.x, valueFeetHeight) + Vector3.right * (+1f));
             if (hit)
             {
                 return Vector2.right;
@@ -211,27 +258,61 @@ public class EntityAI : MonoBehaviour
         {
             //Scouting_States in scouting the player
             //Scout_State 1: Identitfy player when in range, in front of entity
-            RaycastHit2D[] hit = Physics2D.RaycastAll(this.transform.position, OnDirectionFacing, scoutingRangeFront);
-            foreach (var h in hit)
+            float extraHeightText = 2f;
+            RaycastHit2D[] hit = Physics2D.BoxCastAll(this.transform.position, new Vector2(scoutingRangeFront * 2, this.entityCollider2D.bounds.size.y + extraHeightText), 0f, Vector2.up, extraHeightText);
+
+            for (int i = 0; i < hit.GetLength(0); i++)
             {
-                if (h.transform.tag == "Player")
+                if (hit[i].transform.tag == "Player")
                 {
+                    //Check if the player is behind the wall
+                    bool flag = false;
+                    for (int j = 0; j <= i; j++)
+                    {
+                        if (hit[j].transform.tag == "Foreground")
+                        {
+                            //Check the player on front 
+                            if (hit[i].transform.position.x > this.transform.position.x)
+                            {
+                                if (hit[j].transform.position.x > this.transform.position.x && hit[j].transform.position.x < hit[i].transform.position.y)
+                                {
+                                    flag = true;
+                                }
+                                else
+                                {
+
+                                }
+                            }
+                            else
+                            {
+                                if (hit[j].transform.position.x < this.transform.position.x && hit[j].transform.position.x > hit[i].transform.position.y)
+                                {
+                                    flag = true;
+                                }
+                                else
+                                {
+
+                                }
+                            }
+                            if (!(hit[j].transform.position.y < (this.transform.position.y + entityCollider2D.bounds.extents.y)
+                                    && hit[j].transform.position.y > (this.transform.position.y - entityCollider2D.bounds.extents.y)))
+                            {
+                                flag = false;
+                                break;
+                            }
+                        }
+
+                    }
+                    if (flag)
+                    {
+                        return Vector2.zero;
+                    }
                     maxIdentifyTimeCounter = Mathf.MoveTowards(maxIdentifyTimeCounter, maxIdentifyTime, Time.fixedDeltaTime);
 
-                    return h.transform.position;
+                    return hit[i].transform.position;
                 }
             }
-            hit = Physics2D.RaycastAll(this.transform.position, OnDirectionFacing * -1, scoutingRangeBack);
-            foreach (var h in hit)
-            {
-                if (h.transform.tag == "Player")
-                {
-                    maxIdentifyTimeCounter = Mathf.MoveTowards(maxIdentifyTimeCounter, maxIdentifyTime, Time.fixedDeltaTime);
 
-                    return h.transform.position;
-                }
-            }
-            maxIdentifyTimeCounter = Mathf.MoveTowards(maxIdentifyTimeCounter, 0, Time.fixedDeltaTime);
             return Vector2.zero;
 
         }
